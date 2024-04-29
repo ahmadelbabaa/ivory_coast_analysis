@@ -1,0 +1,1192 @@
+---
+title: "AFCON Project"
+format: html
+---
+
+```{r}
+library(StatsBombR)
+library(SBpitch)
+library(soccermatics)
+```
+
+
+```{r}
+comps <- FreeCompetitions()
+matches <- FreeMatches(comps)
+
+afcon_matches <- matches %>% filter(competition.competition_id == 1267) # AFCON
+```
+
+
+
+```{r}
+ivory_coast_team_ID = 3374
+
+ic_pre_manager_change <- afcon_matches %>% 
+  filter(
+    home_team.home_team_id == ivory_coast_team_ID | 
+    away_team.away_team_id == ivory_coast_team_ID
+    ) %>% 
+  filter(match_week < 4) %>% # Filter group stage games (pre manager change)
+  arrange(match_date)
+
+ic_post_manager_change <- afcon_matches %>% 
+  filter(
+    home_team.home_team_id == ivory_coast_team_ID | 
+    away_team.away_team_id == ivory_coast_team_ID
+    ) %>% 
+  filter(match_week >= 4) %>% # Filter knockout stage games (post manager change)
+  arrange(match_date)
+
+sbdata_pre <- free_allevents(MatchesDF = ic_pre_manager_change, Parallel = T)
+sbdata_pre <- allclean(sbdata_pre)
+
+sbdata_post <- free_allevents(MatchesDF = ic_post_manager_change, Parallel = T)
+sbdata_post <- allclean(sbdata_post)
+```
+
+
+# Pre-Manager Change Team Performance
+
+Manager: Jean-Louis Gasset (French)
+
+```{r}
+# 3920384 - Côte d'Ivoire vs Guinea-Bissau
+# 3920398 - Côte d'Ivoire vs Nigeria
+# 3920408 - Côte d'Ivoire vs Equatorial Guinea
+
+vs_GB <- sbdata_pre %>% filter(match_id == 3920384)
+vs_NIG <- sbdata_pre %>% filter(match_id == 3920398)
+vs_EG <- sbdata_pre %>% filter(match_id == 3920408)
+```
+
+## vs Guinea-Bissau
+
+Win, 2-0
+
+```{r}
+cat("Possesion Percentage:")
+prop.table(table(vs_GB$possession_team.name))*100
+# With 60% possesion, Ivory Coast seemed to have dominated the ball most of the time 
+```
+
+```{r}
+# Passing
+
+
+soccerPassmap(
+  vs_GB %>% filter(team.id == ivory_coast_team_ID), 
+  fill = "orange", 
+  arrow = "r",
+  title = "Côte d'Ivoire (vs Guinea-Bissau, AFCON Group Stage - G1)"
+  )
+
+
+
+# Passing Locations (successful passes)
+vs_GB %>% 
+  filter(team.id == ivory_coast_team_ID) %>% 
+  select(player.name, 
+         pass.recipient.name, 
+         location.x, 
+         location.y, 
+         starts_with("pass")) %>% 
+  filter(!is.na(pass.length)) %>% 
+  filter(is.na(pass.outcome.name)) # IMPORTANT DETAIL
+```
+
+```{r}
+# Shooting
+iv_shots_gb <- vs_GB %>% filter(team.id == ivory_coast_team_ID) %>% select(location, starts_with("shot")) %>% filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+print("------------ Ivory Coast ------------")
+c("Goals" = sum(iv_shots_gb$shot.outcome.name == "Goal"),
+  "Shots" = nrow(iv_shots_gb), 
+  "On Target" = sum(iv_shots_gb$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(iv_shots_gb$shot.statsbomb_xg),
+  "Goals per Shot" = sum(iv_shots_gb$shot.outcome.name == "Goal") / nrow(iv_shots_gb),
+  "xG per Shot" = sum(iv_shots_gb$shot.statsbomb_xg) / nrow(iv_shots_gb)
+  )
+
+create_Pitch() +
+  geom_point(data = iv_shots_gb, aes(x = location.x, y = location.y, color = shot.outcome.name == "Goal", size = shot.statsbomb_xg)) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots vs Guinea-Bissau",
+       subtitle = "AFCON Group Stage - Match 1")
+
+
+
+
+gb_shots <- vs_GB %>% filter(team.id != ivory_coast_team_ID) %>% select(location, starts_with("shot")) %>% filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+# Shots and Shots on Target
+print("------------ Guinea-Bisseau ------------")
+c("Goals" = sum(gb_shots$shot.outcome.name == "Goal"),
+  "Shots" = nrow(gb_shots), 
+  "On Target" = sum(gb_shots$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(gb_shots$shot.statsbomb_xg),
+  "Goals per Shot" = sum(gb_shots$shot.outcome.name == "Goal") / nrow(gb_shots),
+  "xG per Shot" = sum(gb_shots$shot.statsbomb_xg) / nrow(gb_shots)
+  )
+
+create_Pitch() +
+  geom_point(data = gb_shots, aes(x = location.x, y = location.y, color = shot.outcome.name, size = shot.statsbomb_xg)) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots Conceded vs Guinea-Bissau",
+       subtitle = "AFCON Group Stage - Match 1")
+```
+
+Both teams had the same number of shots in the match, however Ivory Coast seemed to limit their opponents shots to long range, low value shots, while they themselves seemed to be getting into pretty good areas. This is seen in the xG with Ivory coast having a higher metric than GB. It is still important to note that they over-performed their xG by quite a bit (xG less than 1, scoring 2 goals)
+
+## vs Nigeria
+
+Loss, 1-0
+
+```{r}
+cat("Possesion Percentage:")
+prop.table(table(vs_NIG$possession_team.name))*100
+# In the second game of the group stage they had even more possesion than in the first, with 62%, showing signs of a consistent ability to retain the ball.
+```
+
+```{r}
+# Passing
+
+soccerPassmap(
+  vs_NIG %>% filter(team.id == ivory_coast_team_ID), 
+  fill = "green", 
+  arrow = "r",
+  title = "Côte d'Ivoire (vs Nigeria, AFCON Group Stage - G2)"
+  )
+```
+
+```{r}
+# Shooting
+iv_shots_nig <- vs_NIG %>% filter(team.id == ivory_coast_team_ID) %>% select(location, starts_with("shot")) %>% filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+print("------------ Ivory Coast ------------")
+c("Goals" = sum(iv_shots_nig$shot.outcome.name == "Goal"),
+  "Shots" = nrow(iv_shots_nig), 
+  "On Target" = sum(iv_shots_nig$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(iv_shots_nig$shot.statsbomb_xg),
+  "Goals per Shot" = sum(iv_shots_nig$shot.outcome.name == "Goal") / nrow(iv_shots_nig),
+  "xG per Shot" = sum(iv_shots_nig$shot.statsbomb_xg) / nrow(iv_shots_nig)
+  )
+
+create_Pitch() +
+  geom_point(data = iv_shots_nig, 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots vs Nigeria",
+       subtitle = "AFCON Group Stage - Match 2")
+
+
+
+
+nig_shots <- vs_NIG %>% filter(team.id != ivory_coast_team_ID) %>% select(location, starts_with("shot")) %>% filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+print("------------ Nigeria ------------")
+c("Goals" = sum(nig_shots$shot.outcome.name == "Goal"),
+  "Shots" = nrow(nig_shots), 
+  "On Target" = sum(nig_shots$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(nig_shots$shot.statsbomb_xg),
+  "np_xG" = nig_shots %>% filter(shot.type.name != "Penalty") %>% pull(shot.statsbomb_xg) %>% sum(),
+  "Goals per Shot" = sum(nig_shots$shot.outcome.name == "Goal") / nrow(nig_shots),
+  "np_xG per Shot" = nig_shots %>% filter(shot.type.name != "Penalty") %>% pull(shot.statsbomb_xg) %>% sum() / nrow(nig_shots)
+  )
+
+create_Pitch() +
+  geom_point(data = nig_shots, 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots Conceded vs Nigeria",
+       subtitle = "AFCON Group Stage - Match 2")
+
+```
+
+Despite having more shots, Ivory Coast seemed to get frstrated, trying chances from further and further away as the game went on. They also did an ok job limiting Nigeria to not so high xG shots, also giving them just 1 goal on target, but even without the penalty Nigeria still had a higher xG. Both teams had less than 1.
+
+## vs Equatorial Guinea
+
+Loss, 4-0
+
+```{r}
+cat("Possesion Percentage:")
+prop.table(table(vs_EG$possession_team.name))*100
+```
+
+Consisten ability to hold possession, consistently wasteful with it. At almost 70% possession for Ivory Coast, they were destroyed 4-0 in what was likley the real wake up call to bring on a managerial change.
+
+```{r}
+# Passing
+
+soccerPassmap(
+  vs_EG %>% filter(team.id == ivory_coast_team_ID), 
+  fill = "lightgray", 
+  arrow = "r",
+  title = "Côte d'Ivoire (vs Equatorial Guinea, AFCON Group Stage - G3)"
+  )
+```
+
+```{r}
+# Shooting
+iv_shots_eg <- vs_EG %>% filter(team.id == ivory_coast_team_ID) %>% select(location, starts_with("shot")) %>% filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+print("------------ Ivory Coast ------------")
+c("Goals" = sum(iv_shots_eg$shot.outcome.name == "Goal"),
+  "Shots" = nrow(iv_shots_eg), 
+  "On Target" = sum(iv_shots_eg$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(iv_shots_eg$shot.statsbomb_xg),
+  "Goals per Shot" = sum(iv_shots_eg$shot.outcome.name == "Goal") / nrow(iv_shots_eg),
+  "xG per Shot" = sum(iv_shots_eg$shot.statsbomb_xg) / nrow(iv_shots_eg)
+  )
+
+create_Pitch() +
+  geom_point(data = iv_shots_eg, 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots vs E.G.",
+       subtitle = "AFCON Group Stage - Match 3")
+
+
+
+
+eg_shots <- vs_EG %>% filter(team.id != ivory_coast_team_ID) %>% select(location, starts_with("shot")) %>% filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+print("------------ Equatorial Guinea ------------")
+c("Goals" = sum(eg_shots$shot.outcome.name == "Goal"),
+  "Shots" = nrow(eg_shots), 
+  "On Target" = sum(eg_shots$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(eg_shots$shot.statsbomb_xg),
+  "Goals per Shot" = sum(eg_shots$shot.outcome.name == "Goal") / nrow(eg_shots),
+  "xG per Shot" = sum(eg_shots$shot.statsbomb_xg) / nrow(eg_shots)
+  )
+
+create_Pitch() +
+  geom_point(data = eg_shots, 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots Conceded vs E.G.",
+       subtitle = "AFCON Group Stage - Match 3")
+
+```
+
+Despite a higher xG than their opponents, Ivory Coast seem to be the most wasteful team in the world in front of Goal. At just over 2 xG, they managed an impressive 0 goals, and from 22 shots even more impressive only 3 were on target. They are defensively a mess, even if they had the ball almost the whole game, they let EG have 70% on target rate, 7 out of 10. CONTEXT: Equatorial Guinea was the best team in the group, winning 2 and drawing 1.
+
+[**Summary:**]{.underline}
+
+The only game Ivory Coast won in the group stage was against the last in the group, Guinea-Bissau, who had 0 wins 0 draws and 3 losses.
+
+
+
+## OVERALL PERFORMANCE
+
+```{r}
+group_stage_games <- sbdata_pre %>% filter(match_id %in% c(3920384, 3920398, 3920408))
+gs <- group_stage_games
+```
+
+```{r}
+# goals per game
+# goals conceded per game
+
+cat('Goals For\n')
+gs_gls_for <- gs %>% 
+  filter(team.id == ivory_coast_team_ID) %>% 
+  group_by(match_id) %>% 
+  summarise(goals_for = sum(shot.outcome.name == "Goal", na.rm = T)) %>% 
+  pull(goals_for) %>% sum()
+cat(gs_gls_for)
+
+cat("\nGoals per Game\n")
+cat(gs_gls_for / 3, "\n")
+cat('xG For per game\n')
+gs_gls_ag <- gs %>% 
+  filter(team.id == ivory_coast_team_ID) %>% 
+  group_by(match_id) %>% 
+  summarise(goals_against = sum(shot.statsbomb_xg, na.rm = T)) %>% 
+  pull(goals_against) %>% sum()
+cat(gs_gls_ag / 3, "\n")
+
+cat('\nGoals Against\n')
+gs_gls_ag <- gs %>% 
+  filter(team.id != ivory_coast_team_ID) %>% 
+  group_by(match_id) %>% 
+  summarise(goals_against = sum(shot.outcome.name == "Goal", na.rm = T)) %>% 
+  pull(goals_against) %>% sum()
+cat(gs_gls_ag)
+
+
+cat("\nGoals Conceded per Game\n")
+cat(gs_gls_ag / 3, "\n")
+
+cat('xG Against per Game\n')
+gs_gls_ag <- gs %>% 
+  filter(team.id != ivory_coast_team_ID) %>% 
+  group_by(match_id) %>% 
+  summarise(goals_against = sum(shot.statsbomb_xg, na.rm = T)) %>% 
+  pull(goals_against) %>% sum()
+cat(gs_gls_ag / 3)
+
+
+```
+
+
+They conceded a whole goal more than their opponents per game during the group stage, while having a higher xG per Game. It is clear that bad finishing is a big part of their bad performances, which leads to the question...
+
+          
+          
+            
+            Was the players lack of good finishing the managers fault?
+
+
+
+
+
+# Post-Manager Change Team Performance
+
+
+Manager: Emerse Fae (Ivorian)
+
+```{r}
+# table(sbdata_post$possession_team.name)
+# 4 games 
+
+# 3922242 - vs Senegal - Game 1 R16
+# 3922659 - vs Mali - Game 2 QF
+# 3922838 - vs Congo DR - Game 3 SF
+# 3923881 - vs Nigeria - Game 4 FINAL
+
+vs_SEN <- sbdata_post %>% filter(match_id == 3922242)
+vs_MALI <- sbdata_post %>% filter(match_id == 3922659)
+vs_CDR <- sbdata_post %>% filter(match_id == 3922838)
+vs_NIG_final <- sbdata_post %>% filter(match_id == 3923881)
+```
+
+## Vs Senegal
+
+1-1, win in penlaties
+
+```{r}
+cat("Possesion Percentage:")
+prop.table(table(vs_SEN$possession_team.name))*100
+```
+
+```{r}
+# Passing
+
+soccerPassmap(
+  vs_SEN %>% filter(team.id == ivory_coast_team_ID), 
+  fill = "lightgray", 
+  arrow = "r",
+  title = "Côte d'Ivoire (vs Senegal, AFCON R16)"
+  )
+
+
+vs_SEN %>% 
+  filter(team.id == ivory_coast_team_ID) %>% 
+  select(player.name, 
+         pass.recipient.name, 
+         location.x, 
+         location.y, 
+         starts_with("pass")) %>% 
+  filter(!is.na(pass.length)) %>% 
+  filter(is.na(pass.outcome.name)) %>% 
+  group_by(player.name,pass.recipient.name) %>% 
+  summarise(passes = n()) %>% 
+  arrange(-passes)
+```
+
+
+
+```{r}
+# Shooting
+
+# shot.type.name to filter for penalties
+
+iv_shots_sen <- vs_SEN %>% filter(team.id == ivory_coast_team_ID) %>% 
+  select(period, location, starts_with("shot")) %>% 
+  filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  ) %>% 
+  filter(period != 5)
+
+
+print("------------ Ivory Coast ------------")
+c("Goals" = sum(iv_shots_sen$shot.outcome.name == "Goal"),
+  "Shots" = nrow(iv_shots_sen), 
+  "On Target" = sum(iv_shots_sen$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(iv_shots_sen$shot.statsbomb_xg),
+  "non-penalty xG" = iv_shots_sen %>% 
+    filter(shot.type.name != "Penalty") %>% 
+    pull(shot.statsbomb_xg) %>% 
+    sum(),
+  "Goals per Shot" = sum(iv_shots_sen$shot.outcome.name == "Goal") / nrow(iv_shots_sen),
+  "np_xG per Shot" = iv_shots_sen %>% 
+    filter(shot.type.name != "Penalty") %>% 
+    pull(shot.statsbomb_xg) %>% 
+    sum() / nrow(iv_shots_sen)
+  )
+
+create_Pitch() +
+  geom_point(data = iv_shots_sen, 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots vs Senegal",
+       subtitle = "AFCON R16")
+
+
+
+
+SEN_shots <- vs_SEN %>% filter(team.id != ivory_coast_team_ID) %>% select(location, starts_with("shot")) %>% filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  ) %>% 
+  filter(shot.type.name != "Penalty")
+
+print("------------ Senegal ------------")
+c("Goals" = sum(SEN_shots$shot.outcome.name == "Goal"),
+  "Shots" = nrow(SEN_shots), 
+  "On Target" = sum(SEN_shots$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(SEN_shots$shot.statsbomb_xg),
+  "Goals per Shot" = sum(SEN_shots$shot.outcome.name == "Goal") / nrow(SEN_shots),
+  "xG per Shot" = sum(SEN_shots$shot.statsbomb_xg) / nrow(SEN_shots)
+  )
+
+create_Pitch() +
+  geom_point(data = SEN_shots, 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots Conceded vs Senegal",
+       subtitle = "AFCON R16")
+
+```
+
+Penalties might not be the ideal way to start of the knockout stages of the tournament, but still a win is a win.
+
+
+## Vs Mali
+
+2-1 in extra time
+
+```{r}
+cat("Possession Percentage:")
+prop.table(table(vs_MALI$possession_team.name))*100
+```
+
+
+```{r}
+# Passing
+
+soccerPassmap(
+  vs_MALI %>% filter(team.id == ivory_coast_team_ID), 
+  fill = "lightgray", 
+  arrow = "r",
+  title = "Côte d'Ivoire (vs Mali, AFCON R16)"
+  )
+
+
+vs_MALI %>% 
+  filter(team.id == ivory_coast_team_ID) %>% 
+  select(player.name, 
+         pass.recipient.name, 
+         location.x, 
+         location.y, 
+         starts_with("pass")) %>% 
+  filter(!is.na(pass.length)) %>% 
+  filter(is.na(pass.outcome.name)) %>% 
+  group_by(player.name,pass.recipient.name) %>% 
+  summarise(passes = n()) %>% 
+  arrange(-passes)
+```
+
+
+```{r}
+# Shooting
+
+iv_shots_mali <- vs_MALI %>% filter(team.id == ivory_coast_team_ID) %>% 
+  select(period, location, starts_with("shot")) %>% 
+  filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+mali_shots <- vs_MALI %>% filter(team.id != ivory_coast_team_ID) %>% 
+  select(period, location, starts_with("shot")) %>% 
+  filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+
+print("------------ Ivory Coast ------------")
+c("Goals" = sum(iv_shots_mali$shot.outcome.name == "Goal"),
+  "Shots" = nrow(iv_shots_mali), 
+  "On Target" = sum(iv_shots_mali$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(iv_shots_mali$shot.statsbomb_xg),
+  "Goals per Shot" = sum(iv_shots_mali$shot.outcome.name == "Goal") / nrow(iv_shots_mali),
+  "xG per Shot" = sum(iv_shots_mali$shot.statsbomb_xg) / nrow(iv_shots_mali)
+  # "non-penalty xG" = iv_shots_mali %>% 
+  #   filter(shot.type.name != "Penalty") %>% 
+  #   pull(shot.statsbomb_xg) %>% 
+  #   sum()
+  )
+
+create_Pitch() +
+  geom_point(data = iv_shots_mali %>% filter(period < 3), 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots vs Mali - Normal 90",
+       subtitle = "AFCON QF")
+
+
+create_Pitch() +
+  geom_point(data = mali_shots %>% filter(period < 3), 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots CONCEDED vs Mali - Normal 90",
+       subtitle = "AFCON QF")
+
+
+
+
+print("------------ Mali ------------")
+c("Goals" = sum(mali_shots$shot.outcome.name == "Goal"),
+  "Shots" = nrow(mali_shots), 
+  "On Target" = sum(mali_shots$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(mali_shots$shot.statsbomb_xg),
+  "non-penalty xG" = mali_shots %>%
+    filter(shot.type.name != "Penalty") %>%
+    pull(shot.statsbomb_xg) %>%
+    sum(),
+  "Goals per Shot" = sum(mali_shots$shot.outcome.name == "Goal") / nrow(mali_shots),
+  "xG per Shot" = sum(mali_shots$shot.statsbomb_xg) / nrow(mali_shots)
+  )
+
+
+create_Pitch() +
+  geom_point(data = iv_shots_mali %>% filter(period>2), 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots vs Mali - Extra Time",
+       subtitle = "AFCON QF")
+
+
+create_Pitch() +
+  geom_point(data = mali_shots %>% filter(period>2), 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots CONCEDED vs Mali - Extra Time",
+       subtitle = "AFCON QF")
+
+```
+
+
+
+
+## Vs Congo DR
+
+1-0, 
+
+```{r}
+cat("Possession Percentage:")
+prop.table(table(vs_CDR$possession_team.name))*100
+```
+
+
+```{r}
+# Passing
+
+soccerPassmap(
+  vs_CDR %>% filter(team.id == ivory_coast_team_ID), 
+  fill = "lightblue", 
+  arrow = "r",
+  title = "Côte d'Ivoire (vs Congo DR, AFCON Semi Final)"
+  )
+```
+
+
+```{r}
+# Shooting
+
+iv_shots_cdr <- vs_CDR %>% filter(team.id == ivory_coast_team_ID) %>% 
+  select(period, location, starts_with("shot")) %>% 
+  filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+
+print("------------ Ivory Coast ------------")
+c("Goals" = sum(iv_shots_cdr$shot.outcome.name == "Goal"),
+  "Shots" = nrow(iv_shots_cdr), 
+  "On Target" = sum(iv_shots_cdr$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(iv_shots_cdr$shot.statsbomb_xg),
+  "Goals per Shot" = sum(iv_shots_cdr$shot.outcome.name == "Goal") / nrow(iv_shots_cdr),
+  "xG per Shot" = sum(iv_shots_cdr$shot.statsbomb_xg) / nrow(iv_shots_cdr)
+  # "non-penalty xG" = iv_shots_cdr %>% 
+  #   filter(shot.type.name != "Penalty") %>% 
+  #   pull(shot.statsbomb_xg) %>% 
+  #   sum()
+  )
+
+create_Pitch() +
+  geom_point(data = iv_shots_cdr %>% filter(period < 3), 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots vs Congo DR",
+       subtitle = "AFCON Semi Final")
+
+
+
+
+
+congo_shots <- vs_CDR %>% filter(team.id != ivory_coast_team_ID) %>% 
+  select(period, location, starts_with("shot")) %>% 
+  filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+
+print("------------ Congo DR ------------")
+c("Goals" = sum(congo_shots$shot.outcome.name == "Goal"),
+  "Shots" = nrow(congo_shots), 
+  "On Target" = sum(congo_shots$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(congo_shots$shot.statsbomb_xg),
+  "Goals per Shot" = sum(congo_shots$shot.outcome.name == "Goal") / nrow(congo_shots),
+  "xG per Shot" = sum(congo_shots$shot.statsbomb_xg) / nrow(congo_shots)
+  )
+
+create_Pitch() +
+  geom_point(data = congo_shots %>% filter(period < 3), 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots CONCEDED vs Congo DR",
+       subtitle = "AFCON Semi Final")
+
+```
+
+
+
+## Vs Nigeria
+
+2-1 win
+
+```{r}
+cat("Possession Percentage:")
+prop.table(table(vs_NIG_final$possession_team.name))*100
+```
+
+
+```{r}
+soccerPassmap(
+  vs_NIG_final %>% filter(team.id == ivory_coast_team_ID), 
+  fill = "lightblue", 
+  arrow = "r",
+  title = "Côte d'Ivoire (vs Nigeria, AFCON Final)"
+  )
+```
+
+
+```{r}
+# Shooting
+
+iv_shots_final <- vs_NIG_final %>% filter(team.id == ivory_coast_team_ID) %>% 
+  select(period, location, starts_with("shot")) %>% 
+  filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+
+print("------------ Ivory Coast ------------")
+c("Goals" = sum(iv_shots_final$shot.outcome.name == "Goal"),
+  "Shots" = nrow(iv_shots_final), 
+  "On Target" = sum(iv_shots_final$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(iv_shots_final$shot.statsbomb_xg),
+  "Goals per Shot" = sum(iv_shots_final$shot.outcome.name == "Goal") / nrow(iv_shots_final),
+  "xG per Shot" = sum(iv_shots_final$shot.statsbomb_xg) / nrow(iv_shots_final)
+  # "non-penalty xG" = iv_shots_final %>% 
+  #   filter(shot.type.name != "Penalty") %>% 
+  #   pull(shot.statsbomb_xg) %>% 
+  #   sum()
+  )
+
+create_Pitch() +
+  geom_point(data = iv_shots_final %>% filter(period < 3), 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots vs Nigeria",
+       subtitle = "AFCON Final")
+
+
+
+nig_final_shots <- vs_NIG_final %>% filter(team.id != ivory_coast_team_ID) %>% 
+  select(period, location, starts_with("shot")) %>% 
+  filter(!is.na(shot.statsbomb_xg)) %>% 
+  mutate(
+    location.x = map_dbl(location, 1),
+    location.y = map_dbl(location, 2),
+    end_location.x = map_dbl(shot.end_location, 1),
+    end_location.y = map_dbl(shot.end_location, 2)
+  )
+
+
+print("------------ Nigeria ------------")
+c("Goals" = sum(nig_final_shots$shot.outcome.name == "Goal"),
+  "Shots" = nrow(nig_final_shots), 
+  "On Target" = sum(nig_final_shots$shot.outcome.name %in% c("Goal", 
+                                                         "Saved", 
+                                                         "Saved to Post")
+                    ),
+  "xG" = sum(nig_final_shots$shot.statsbomb_xg),
+  "Goals per Shot" = sum(nig_final_shots$shot.outcome.name == "Goal") / nrow(nig_final_shots),
+  "xG per Shot" = sum(nig_final_shots$shot.statsbomb_xg) / nrow(nig_final_shots)
+  )
+
+create_Pitch() +
+  geom_point(data = nig_final_shots %>% filter(period < 3), 
+             aes(x = location.x, 
+                 y = location.y, 
+                 color = shot.outcome.name,
+                 size = shot.statsbomb_xg
+                 ), 
+             # size = 3
+             ) +
+  theme(
+  ) +
+  labs(title = "Ivory Coast Shots CONCEDED vs Nigeria",
+       subtitle = "AFCON Final")
+```
+
+
+
+## OVERALL PERFORMANCE
+
+```{r}
+knockout_games <- sbdata_post %>% filter(match_id %in% c(3922242, 3922659, 3922838, 3923881))
+ko <- knockout_games
+# 3922242 - vs Senegal - Game 1 R16
+# 3922659 - vs Mali - Game 2 QF
+# 3922838 - vs Congo DR - Game 3 SF
+# 3923881 - vs Nigeria - Game 4 FINAL
+```
+
+```{r}
+cat('Goals For\n')
+gs_gls_for <- ko %>% 
+  filter(team.id == ivory_coast_team_ID) %>% 
+  group_by(match_id) %>% 
+  summarise(goals_for = sum(shot.outcome.name == "Goal", na.rm = T)) %>% 
+  pull(goals_for) %>% sum()
+cat(gs_gls_for)
+
+cat("\nGoals per Game\n")
+cat(gs_gls_for / 3, "\n")
+cat('xG For per game\n')
+gs_gls_ag <- ko %>% 
+  filter(team.id == ivory_coast_team_ID) %>% 
+  group_by(match_id) %>% 
+  summarise(goals_against = sum(shot.statsbomb_xg, na.rm = T)) %>% 
+  pull(goals_against) %>% sum()
+cat(gs_gls_ag / 3, "\n")
+
+cat('\nGoals Against\n')
+gs_gls_ag <- ko %>% 
+  filter(team.id != ivory_coast_team_ID) %>% 
+  group_by(match_id) %>% 
+  summarise(goals_against = sum(shot.outcome.name == "Goal", na.rm = T)) %>% 
+  pull(goals_against) %>% sum()
+cat(gs_gls_ag)
+
+
+cat("\nGoals Conceded per Game\n")
+cat(gs_gls_ag / 3, "\n")
+
+cat('xG Against per Game\n')
+gs_gls_ag <- ko %>% 
+  filter(team.id != ivory_coast_team_ID) %>% 
+  group_by(match_id) %>% 
+  summarise(goals_against = sum(shot.statsbomb_xg, na.rm = T)) %>% 
+  pull(goals_against) %>% sum()
+cat(gs_gls_ag / 3)
+
+
+```
+
+
+# CONLCUSION
+
+Their poor start to the tournament was largley due to poor finishing. This seems to be a player-problem, rather than a manager one, as for the most part Ivory Coast was creating better chances (xG per shot/game) than their opponents. Why did the players perform better under this new manager?
+
+
+
+# Players
+
+```{r}
+# 3920384 - Côte d'Ivoire vs Guinea-Bissau
+# 3920398 - Côte d'Ivoire vs Nigeria
+# 3920408 - Côte d'Ivoire vs Equatorial Guinea
+
+group_stage_games <- sbdata_pre %>% filter(match_id %in% c(3920384, 3920398, 3920408))
+gs <- group_stage_games
+```
+
+```{r}
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(passes = sum(type.name == "Pass")) %>% 
+  arrange(-passes) %>% 
+  filter(team.name == "Côte d'Ivoire")
+
+
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(shots = sum(type.name == "Shot")) %>% 
+  arrange(-shots) %>% 
+  filter(team.name == "Côte d'Ivoire")
+
+
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(touches = sum(type.name == "Ball Receipt*")) %>% 
+  arrange(-touches) %>% 
+  filter(team.name == "Côte d'Ivoire")
+
+
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Block = sum(type.name == "Block")) %>% 
+  arrange(-Block) %>% 
+  filter(team.name == "Côte d'Ivoire")
+
+
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Clearance = sum(type.name == "Clearance")) %>% 
+  arrange(-Clearance) %>% 
+  filter(team.name == "Côte d'Ivoire")
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Dribble = sum(type.name == "Dribble")) %>% 
+  arrange(-Dribble) %>% 
+  filter(team.name == "Côte d'Ivoire")
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Carry = sum(type.name == "Carry")) %>% 
+  arrange(-Carry) %>% 
+  filter(team.name == "Côte d'Ivoire")
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Interception = sum(type.name == "Interception")) %>% 
+  arrange(-Interception) %>% 
+  filter(team.name == "Côte d'Ivoire")
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Pressure = sum(type.name == "Pressure")) %>% 
+  arrange(-Pressure) %>% 
+  filter(team.name == "Côte d'Ivoire")
+```
+
+
+3 players stand out from the AFCON group stages for Ivory Coast, they are Obite Evan Ndicka, Ibrahim Sangaré, and Seko Fofana. This aligns with the passing networks we saw before. Lets take a loot at each of the players.
+
+
+```{r}
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(shots = sum(type.name == "Shot"), on_target = sum(shot.outcome.name %in% c("Saved", "Saved to Post", "Goal"))) %>% 
+  arrange(-shots) %>% 
+  filter(team.name == "Côte d'Ivoire") %>% 
+  mutate(shot_perc = on_target / shots,
+         shot_perc = ifelse(shot_perc > 100, 0, shot_perc)) %>% 
+  arrange(-shot_perc)
+
+
+
+gs %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(goals = sum(shot.outcome.name == "Goal", na.rm = T)) %>% 
+  arrange(-goals) %>% 
+  filter(team.name == "Côte d'Ivoire")
+```
+
+
+### Ndicka
+
+```{r}
+ndicka_touches_all_games <- gs %>% filter(player.name == "Obite Evan Ndicka") %>% filter(type.name == "Ball Receipt*")
+  
+create_Pitch() +
+  geom_point(data = ndicka_touches_all_games %>% filter(period == 1), 
+             aes(x = location.x, 
+                 y = location.y
+                 )
+             ) +
+  geom_segment(
+    aes(
+      x = 5,
+      y = -5,
+      xend = 50,
+      yend = -5
+      ),
+    arrow = arrow(length = unit(0.3, "cm"))
+  ) +
+  labs(
+    title = "First Half"
+  )
+
+
+create_Pitch() +
+  geom_point(data = ndicka_touches_all_games %>% filter(period == 2), 
+             aes(x = location.x, 
+                 y = location.y
+                 )
+             ) +
+  geom_segment(aes(x = 5,
+                   y = -5,
+                   xend = 50,
+                   yend = -5
+              ),
+              arrow = arrow(length = unit(0.3, "cm"))
+  ) +
+  labs(
+    title = "Second Half"
+  )
+
+```
+
+The touch maps show an interesting pattern. Ndicka tends to be more compact in the first half, and much more expansive in the second. In the firs half of matches, he is very disciplined positonally, and only reaches the opponents box once. While in the second, he takes up many more positions, getting deeper and more centrally to defend, but also reaching the opposition box 4 times. This can be due to the fact that they where behind in most matches, and in the search for a goal would get more corners and he would go up to attack. 
+
+
+
+## Fofana
+
+The player with the most shots. However, as such, he might also be one of the biggest people to blame in their disappointing group stage matches, as he only hits 30% of them on target. As we saw earlier, Ivory Coast had a higher xG per game than their opponents in the Group Stage matches, they just could not finish their chances. Lets look at their biggest shot taker based on volume, Fofana. He had 10 shots during the group stage, 3 on target, 1 goal, and accumulated 0.38 xG. From 10 shots those numbers are not great, because given his average xG per shot he would need to take 26 shots to score a goal. 
+
+```{r}
+cat("Total xG\n")
+gs %>% 
+  filter(player.name == "Seko Fofana") %>% 
+  pull(shot.statsbomb_xg) %>% sum(na.rm = T)
+
+
+cat('\nShots needed to score 1 goal according to xG\n')
+1 / gs %>% 
+  filter(player.name == "Seko Fofana") %>% 
+  pull(shot.statsbomb_xg) %>% mean(na.rm = T)
+
+```
+
+Lets look at the spaces he would take up.
+
+```{r}
+fofana_touches_all_games <- gs %>% filter(player.name == "Seko Fofana") %>% filter(type.name == "Ball Receipt*")
+
+create_Pitch() +
+  geom_point(data = fofana_touches_all_games, 
+             aes(x = location.x, 
+                 y = location.y
+                 )
+             ) +
+  geom_segment(
+    aes(
+      x = 5,
+      y = -5,
+      xend = 50,
+      yend = -5
+      ),
+    arrow = arrow(length = unit(0.3, "cm"))
+  )
+```
+
