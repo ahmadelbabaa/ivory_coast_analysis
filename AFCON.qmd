@@ -1013,6 +1013,8 @@ Their poor start to the tournament was largley due to poor finishing. This seems
 
 # Players
 
+## Group Stage
+
 ```{r}
 # 3920384 - Côte d'Ivoire vs Guinea-Bissau
 # 3920398 - Côte d'Ivoire vs Nigeria
@@ -1150,7 +1152,7 @@ The touch maps show an interesting pattern. Ndicka tends to be more compact in t
 
 
 
-## Fofana
+### Fofana
 
 The player with the most shots. However, as such, he might also be one of the biggest people to blame in their disappointing group stage matches, as he only hits 30% of them on target. As we saw earlier, Ivory Coast had a higher xG per game than their opponents in the Group Stage matches, they just could not finish their chances. Lets look at their biggest shot taker based on volume, Fofana. He had 10 shots during the group stage, 3 on target, 1 goal, and accumulated 0.38 xG. From 10 shots those numbers are not great, because given his average xG per shot he would need to take 26 shots to score a goal. 
 
@@ -1188,5 +1190,88 @@ create_Pitch() +
       ),
     arrow = arrow(length = unit(0.3, "cm"))
   )
+```
+
+
+## Knockouts
+
+```{r}
+knockout_games <- sbdata_post %>% filter(match_id %in% c(3922242, 3922659, 3922838, 3923881))
+ko <- knockout_games
+# 3922242 - vs Senegal - Game 1 R16
+# 3922659 - vs Mali - Game 2 QF
+# 3922838 - vs Congo DR - Game 3 SF
+# 3923881 - vs Nigeria - Game 4 FINAL
+```
+
+```{r}
+ko %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(passes = sum(type.name == "Pass")) %>% 
+  arrange(-passes) %>% 
+  filter(team.name == "Côte d'Ivoire")
+
+
+ko %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(shots = sum(type.name == "Shot")) %>% 
+  arrange(-shots) %>% 
+  filter(team.name == "Côte d'Ivoire")
+
+
+ko %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(touches = sum(type.name == "Ball Receipt*")) %>% 
+  arrange(-touches) %>% 
+  filter(team.name == "Côte d'Ivoire")
+
+
+ko %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Block = sum(type.name == "Block")) %>% 
+  arrange(-Block) %>% 
+  filter(team.name == "Côte d'Ivoire")
+
+
+ko %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Clearance = sum(type.name == "Clearance")) %>% 
+  arrange(-Clearance) %>% 
+  filter(team.name == "Côte d'Ivoire")
+ko %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Dribble = sum(type.name == "Dribble")) %>% 
+  arrange(-Dribble) %>% 
+  filter(team.name == "Côte d'Ivoire")
+ko %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Carry = sum(type.name == "Carry")) %>% 
+  arrange(-Carry) %>% 
+  filter(team.name == "Côte d'Ivoire")
+ko %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Interception = sum(type.name == "Interception")) %>% 
+  arrange(-Interception) %>% 
+  filter(team.name == "Côte d'Ivoire")
+ko %>% 
+  group_by(player.name, team.name) %>% 
+  summarise(Pressure = sum(type.name == "Pressure")) %>% 
+  arrange(-Pressure) %>% 
+  filter(team.name == "Côte d'Ivoire")
+```
+
+
+### Haller
+
+```{r}
+haller <- ko %>% 
+  filter(player.name == "Sébastien Haller") %>% 
+  filter(type.name == "Shot") %>% 
+  select(location.x, location.y, shot.statsbomb_xg, shot.outcome.name)
+
+create_Pitch() +
+  geom_point(data = haller, aes(x = location.x, y = location.y,
+                                color = shot.outcome.name,
+                                size = shot.statsbomb_xg))
 ```
 
